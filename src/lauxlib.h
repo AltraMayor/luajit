@@ -10,6 +10,7 @@
 
 
 #include <stddef.h>
+#include <stdint.h>
 #include <stdio.h>
 
 #include "lua.h"
@@ -51,6 +52,81 @@ LUALIB_API void (luaL_checkany) (lua_State *L, int narg);
 
 LUALIB_API int   (luaL_newmetatable) (lua_State *L, const char *tname);
 LUALIB_API void *(luaL_checkudata) (lua_State *L, int ud, const char *tname);
+
+LUALIB_API void *(luaL_pushcdata)(struct lua_State *l, uint32_t ctypeid,
+					uint32_t size);
+LUALIB_API void *(luaL_checkcdata)(struct lua_State *l, int idx,
+				uint32_t *ctypeid, const char *ctypename);
+/* Execute ffi.cdef before first calling luaL_get_ctypeid()! */
+LUALIB_API uint32_t (luaL_get_ctypeid)(struct lua_State *l,
+			const char *ctypename);
+
+#if 0
+
+/*
+ * Code example
+ */
+
+struct request;
+
+/*
+ * ATTENTION: Execute ffi.cdef on struct request here!
+ *
+ * Example:
+ *
+ * ffi.cdef([[
+ *	-- From request.h.
+ *	struct request
+ *	{
+ *		-- Some members.
+ *	};
+ * ]])
+ *
+ * From now on, one can call luaL_get_ctypeid() on "struct request".
+ */
+
+/* Get CTIDs calling luaL_get_ctypeid(). */
+const uint32_t CTID_STRUCT_REQUEST = luaL_get_ctypeid(l, "struct request");
+const uint32_t CTID_STRUCT_REQUEST_PTR =
+	luaL_get_ctypeid(l, "struct request *");
+const uint32_t CTID_STRUCT_REQUEST_REF =
+	luaL_get_ctypeid(l, "struct request &");
+const uint32_t CTID_CONST_STRUCT_REQUEST =
+	luaL_get_ctypeid(l, "const struct request");
+const uint32_t CTID_CONST_STRUCT_REQUEST_PTR =
+	luaL_get_ctypeid(l, "const struct request *");
+const uint32_t CTID_CONST_STRUCT_REQUEST_REF =
+	luaL_get_ctypeid(l, "const struct request &");
+
+static void
+pushrequest(struct lua_State *l, const struct request *request)
+{
+	void *cdata = luaL_pushcdata(l, CTID_CONST_STRUCT_REQUEST_REF,
+		sizeof(request));
+	*(const struct request **)cdata = request;
+}
+
+static const struct request *
+checkrequest(struct lua_State *l, int idx)
+{
+	uint32_t ctypeid;
+	void *cdata = luaL_checkcdata(l, idx, &ctypeid, "struct request");
+
+	if (ctypeid == CTID_STRUCT_REQUEST ||
+			ctypeid == CTID_CONST_STRUCT_REQUEST) {
+		return (const struct request *)cdata;
+	} else if (ctypeid == CTID_CONST_STRUCT_REQUEST_REF ||
+			ctypeid == CTID_CONST_STRUCT_REQUEST_PTR ||
+			ctypeid == CTID_STRUCT_REQUEST_REF ||
+			ctypeid == CTID_STRUCT_REQUEST_PTR) {
+		return *(const struct request **)cdata;
+	}
+
+	luaL_error(l, "expected 'struct request' as %d argument", idx);
+	return NULL;
+}
+
+#endif /* Code example. */
 
 LUALIB_API void (luaL_where) (lua_State *L, int lvl);
 LUALIB_API int (luaL_error) (lua_State *L, const char *fmt, ...);
