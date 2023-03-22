@@ -35,7 +35,7 @@
 /* -- C type checks ------------------------------------------------------- */
 
 /* Check first argument for a C type and returns its ID. */
-static CTypeID ffi_checkctype(lua_State *L, CTState *cts, TValue *param)
+CTypeID ffi_checkctype(lua_State *L, CTState *cts, TValue *param)
 {
   TValue *o = L->base;
   if (!(o < L->top)) {

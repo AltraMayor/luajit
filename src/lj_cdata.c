@@ -344,41 +344,19 @@ luaL_checkcdata(struct lua_State *l, int idx, uint32_t *ctypeid,
 	return (void *)cdataptr(cd);
 }
 
+/* ffi_checkctype() is originally static in file lib_ffi.c. */
+LJ_FUNC CTypeID ffi_checkctype(lua_State *L, CTState *cts, TValue *param);
+
 LUALIB_API uint32_t
-luaL_get_ctypeid(struct lua_State *l, const char *ctypename)
+luaL_get_ctypeid(struct lua_State *L, const char *ctypename)
 {
-	int idx = lua_gettop(l);
 	CTypeID ctypeid;
-	GCcdata *cd;
 
-	/* Get a reference to ffi.typeof. */
-	luaL_loadstring(l, "return require('ffi').typeof");
-	lua_call(l, 0, 1);
-	if (!lua_isfunction(l, -1))
-		luaL_error(l,
-			"%s: can't get a reference to ffi.typeof", __func__);
-
-	lua_pushstring(l, ctypename);
-
-	if (lua_pcall(l, 1, 1, 0)) {
-		if (lua_isstring(l, -1))
-			lua_error(l);
-		goto fail;
-	}
-
-	/* Returned type should be LUA_TCDATA. */
-	if (lua_type(l, -1) != LUA_TCDATA)
-		goto fail;
-	cd = cdataV(l->base + lua_gettop(l) - 1);
-	ctypeid = cd->ctypeid == CTID_CTYPEID
-		? *(CTypeID *)cdataptr(cd)
-		: cd->ctypeid;
-
-	lua_settop(l, idx);
+	lua_pushstring(L, ctypename);
+	lua_insert(L, 1); /* ffi_checkctype() requires this location. */
+	ctypeid = ffi_checkctype(L, ctype_cts(L), NULL);
+	lua_remove(L, 1);
 	return ctypeid;
-
-fail:
-	return luaL_error(l, "Lua call to ffi.typeof failed");
 }
 
-#endif
+#endif /* LJ_HASFFI */
