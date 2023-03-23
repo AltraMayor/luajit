@@ -347,8 +347,8 @@ luaL_checkcdata(struct lua_State *l, int idx, uint32_t *ctypeid,
 /* ffi_checkctype() is originally static in file lib_ffi.c. */
 LJ_FUNC CTypeID ffi_checkctype(lua_State *L, CTState *cts, TValue *param);
 
-LUALIB_API uint32_t
-luaL_get_ctypeid(struct lua_State *L, const char *ctypename)
+static uint32_t
+__luaL_get_ctypeid(struct lua_State *L, const char *ctypename)
 {
 	CTypeID ctypeid;
 
@@ -356,6 +356,35 @@ luaL_get_ctypeid(struct lua_State *L, const char *ctypename)
 	lua_insert(L, 1); /* ffi_checkctype() requires this location. */
 	ctypeid = ffi_checkctype(L, ctype_cts(L), NULL);
 	lua_remove(L, 1);
+	return ctypeid;
+}
+
+#define LUAL_REGISTRY_CTYPEIDS "9764184f-22d5-4863-aea5-fdd2cfd48534"
+
+LUALIB_API uint32_t
+luaL_get_ctypeid(struct lua_State *L, const char *ctypename)
+{
+	int saved_top = lua_gettop(L);
+	CTypeID ctypeid;
+
+	lua_getfield(L, LUA_REGISTRYINDEX, LUAL_REGISTRY_CTYPEIDS);
+	if (!lua_istable(L, -1)) {
+		lua_newtable(L);
+		lua_pushvalue(L, -1);
+		lua_setfield(L, LUA_REGISTRYINDEX, LUAL_REGISTRY_CTYPEIDS);
+	}
+	/* registry[LUAL_REGISTRY_CTYPEIDS] is the top. */
+
+	lua_getfield(L, -1, ctypename);
+	if (lua_isnumber(L, -1)) {
+		ctypeid = lua_tonumber(L, -1);
+	} else {
+		ctypeid = __luaL_get_ctypeid(L, ctypename);
+		lua_pushnumber(L, ctypeid);
+		lua_setfield(L, -3, ctypename);
+	}
+
+	lua_settop(L, saved_top);
 	return ctypeid;
 }
 
